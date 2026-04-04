@@ -177,7 +177,12 @@ with st.sidebar:
     pagina = st.radio("", ["General", "Por modelo", "Por provincia", "Empresas", "Género"],
                       label_visibility="collapsed")
 
-# ── Filtros ────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# FILTROS SEPARADOS
+# ══════════════════════════════════════════════════════════════════════════════
+# df: filtrado SIN rango temporal (para tablas resumen que mantienen todos los datos)
+# df_time: filtrado CON rango temporal (solo para gráficos temporales)
+
 df = df_raw.copy()
 if modelo_sel != "Todos":
     df = df[df["am_modelocl"] == modelo_sel]
@@ -187,10 +192,14 @@ if tipo_sel != "Todos":
     df = df[df["tipo_cliente"] == tipo_sel]
 if gender_sel != "Todos" and "Gender" in df.columns:
     df = df[df["Gender"] == gender_sel]
-if len(fecha_rango) == 2 and "vp_f_compra" in df.columns:
-    mask = ((df["vp_f_compra"].dt.date >= fecha_rango[0]) &
-            (df["vp_f_compra"].dt.date <= fecha_rango[1]))
-    df = df[mask | df["vp_f_compra"].isna()]
+
+# df_time: copia de df pero CON filtro temporal (solo registros con fecha en el rango)
+# Se usa ÚNICAMENTE en gráficos que muestren tiempo (por año, por mes, tendencias)
+df_time = df.copy()
+if len(fecha_rango) == 2 and "vp_f_compra" in df_time.columns:
+    mask = ((df_time["vp_f_compra"].dt.date >= fecha_rango[0]) &
+            (df_time["vp_f_compra"].dt.date <= fecha_rango[1]))
+    df_time = df_time[mask]  # Sin incluir NaN — solo registros con fecha válida en rango
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -235,7 +244,7 @@ COLOR_MAP_GEN = {
 if pagina == "General":
 
     total_clientes = df["cl_k_cliente"].nunique() if "cl_k_cliente" in df.columns else len(df)
-    total_compras  = len(df_raw) if modelo_sel == "Todos" and provincia_sel == "Todas" and tipo_sel == "Todos" else len(df)
+    total_compras  = len(df)
     promedio = round(len(df) / total_clientes, 2) if total_clientes > 0 else 0
 
     st.markdown(f"""
@@ -267,7 +276,8 @@ if pagina == "General":
 
     with col_anio:
         st.markdown('<p class="section-title">Compras por año</p>', unsafe_allow_html=True)
-        anio_df = (df.dropna(subset=["año_compra"])
+        # Usar df_time para gráficos temporales
+        anio_df = (df_time.dropna(subset=["año_compra"])
                    .groupby("año_compra").size().reset_index(name="n")
                    .sort_values("n", ascending=True))
         anio_df["año_compra"] = anio_df["año_compra"].astype(int).astype(str)
@@ -283,6 +293,7 @@ if pagina == "General":
     with col_prov:
         if "cl_dir_provincia" in df.columns:
             st.markdown('<p class="section-title">Clientes por provincia</p>', unsafe_allow_html=True)
+            # Usar df (sin filtro temporal) para mantener todos los datos
             prov_df = (df.groupby("cl_dir_provincia")["cl_k_cliente"]
                        .nunique().reset_index(name="n")
                        .sort_values("n", ascending=True).tail(8))
@@ -297,7 +308,8 @@ if pagina == "General":
 
     if "mes_compra" in df.columns:
         st.markdown('<p class="section-title">Compras por mes</p>', unsafe_allow_html=True)
-        time_df = df.groupby("mes_compra").size().reset_index(name="n").sort_values("mes_compra")
+        # Usar df_time para gráficos temporales
+        time_df = df_time.groupby("mes_compra").size().reset_index(name="n").sort_values("mes_compra")
         fig3 = go.Figure(go.Bar(
             x=time_df["mes_compra"], y=time_df["n"],
             marker_color="#57718a", marker_line_width=0,
@@ -307,6 +319,7 @@ if pagina == "General":
         st.plotly_chart(fig3, use_container_width=True, config=NO_MB)
 
     st.markdown('<p class="section-title">Registro de clientes</p>', unsafe_allow_html=True)
+    # Usar df (sin filtro temporal) para tabla resumen
     cols_show = [c for c in ["cl_apellido","cl_nombre","cl_numero_doc","am_modelocl",
                               "cl_dir_localidad","cl_dir_provincia","empresa","vp_f_compra","Gender"]
                  if c in df.columns]
@@ -328,7 +341,7 @@ elif pagina == "Por modelo":
     col1, col2 = st.columns(2, gap="medium")
 
     with col1:
-        # Torta: distribución de compras por modelo
+        # Torta: distribución de compras por modelo (usar df para mantener todos)
         mod_pie = df.groupby("am_modelocl").size().reset_index(name="n")
         colors  = ["#57718a","#57718a","#00aadd","#73bf69","#fade2a","#ff780a","#e02f44","#555570"]
         label_colors = ["#555570" if l == SIN_DATO else colors[i % len(colors)]
@@ -365,7 +378,8 @@ elif pagina == "Por modelo":
 
     if "mes_compra" in df.columns and not df.empty:
         st.markdown('<p class="section-title">Tendencia mensual por modelo</p>', unsafe_allow_html=True)
-        trend = (df.groupby(["mes_compra", "am_modelocl"])
+        # Usar df_time para gráficos temporales
+        trend = (df_time.groupby(["mes_compra", "am_modelocl"])
                  .size().reset_index(name="n")
                  .sort_values("mes_compra"))
         if not trend.empty:
@@ -380,6 +394,7 @@ elif pagina == "Por modelo":
             st.plotly_chart(fig3, use_container_width=True, config=NO_MB)
 
     st.markdown('<p class="section-title">Resumen por modelo</p>', unsafe_allow_html=True)
+    # Usar df (sin filtro temporal) para tabla resumen
     resumen = (df.groupby("am_modelocl")
                .agg(Compras=("vp_f_compra","count"),
                     Clientes_unicos=("cl_k_cliente","nunique"),
@@ -399,6 +414,7 @@ elif pagina == "Por provincia":
     else:
         col1, col2 = st.columns(2, gap="medium")
         with col1:
+            # Usar df (sin filtro temporal) para tabla resumen
             prov_df = (df.groupby("cl_dir_provincia")
                        .agg(clientes=("cl_k_cliente","nunique"))
                        .reset_index().sort_values("clientes", ascending=True))
@@ -415,6 +431,7 @@ elif pagina == "Por provincia":
 
         with col2:
             if "cl_dir_localidad" in df.columns:
+                # Usar df (sin filtro temporal) para datos completos
                 loc_df = (df.groupby("cl_dir_localidad")["cl_k_cliente"]
                           .nunique().reset_index(name="n")
                           .sort_values("n", ascending=False).head(12)
@@ -431,6 +448,7 @@ elif pagina == "Por provincia":
                 st.plotly_chart(fig2, use_container_width=True, config=NO_MB)
 
         st.markdown('<p class="section-title">Modelo más comprado por provincia</p>', unsafe_allow_html=True)
+        # Usar df (sin filtro temporal) para tabla resumen
         top_mod = (df.groupby(["cl_dir_provincia","am_modelocl"]).size()
                    .reset_index(name="n").sort_values("n", ascending=False)
                    .groupby("cl_dir_provincia").first().reset_index()
@@ -523,18 +541,7 @@ elif pagina == "Empresas":
 elif pagina == "Género":
 
     # Usar df sin filtro de género para que Sin dato siempre aparezca
-    df_gen = df_raw.copy()
-    if modelo_sel != "Todos":
-        df_gen = df_gen[df_gen["am_modelocl"] == modelo_sel]
-    if provincia_sel != "Todas" and "cl_dir_provincia" in df_gen.columns:
-        df_gen = df_gen[df_gen["cl_dir_provincia"] == provincia_sel]
-    if tipo_sel != "Todos":
-        df_gen = df_gen[df_gen["tipo_cliente"] == tipo_sel]
-    if len(fecha_rango) == 2 and "vp_f_compra" in df_gen.columns:
-        mask_fecha = ((df_gen["vp_f_compra"].dt.date >= fecha_rango[0]) &
-                      (df_gen["vp_f_compra"].dt.date <= fecha_rango[1]))
-        # Incluir filas con fecha nula para no perder Sin dato
-        df_gen = df_gen[mask_fecha | df_gen["vp_f_compra"].isna()]
+    df_gen = df.copy()
 
     if "Gender" not in df_gen.columns:
         st.warning("No se encontró la columna Gender en tus datos.")
@@ -617,7 +624,9 @@ elif pagina == "Género":
 
         if "mes_compra" in df_gen.columns:
             st.markdown('<p class="section-title">Tendencia mensual por género</p>', unsafe_allow_html=True)
-            gt_df = df_gen.groupby(["mes_compra","Gender"]).size().reset_index(name="n")
+            # Usar df_time para gráficos temporales (con filtro de fechas)
+            df_gen_time = df_time.copy()
+            gt_df = df_gen_time.groupby(["mes_compra","Gender"]).size().reset_index(name="n")
             fig4 = px.line(gt_df, x="mes_compra", y="n", color="Gender",
                            color_discrete_map=COLOR_MAP_GEN)
             fig4.update_traces(line_width=2)
@@ -626,6 +635,7 @@ elif pagina == "Género":
             st.plotly_chart(fig4, use_container_width=True, config=NO_MB)
 
         st.markdown('<p class="section-title">Registro por género</p>', unsafe_allow_html=True)
+        # Usar df_gen (sin filtro temporal) para tabla resumen
         cols_show = [c for c in ["cl_apellido","cl_nombre","cl_numero_doc","Gender",
                                   "am_modelocl","cl_dir_localidad","cl_dir_provincia","vp_f_compra"]
                      if c in df_gen.columns]
