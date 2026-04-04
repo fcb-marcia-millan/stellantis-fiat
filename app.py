@@ -404,8 +404,9 @@ elif pagina == "Por modelo":
 
     st.markdown('<p class="section-title">Resumen por modelo</p>', unsafe_allow_html=True)
     # Usar df (sin filtro temporal) para tabla resumen
-    resumen = (df.groupby("am_modelocl")
-               .agg(Compras=("vp_f_compra","count"),
+    # Usar size() en lugar de count() para contar TODOS los registros del grupo, incluyendo "Sin dato"
+    resumen = (df.groupby("am_modelocl", dropna=False)
+               .agg(Compras=("am_modelocl","size"),
                     Clientes_unicos=("cl_k_cliente","nunique"),
                     Provincias=("cl_dir_provincia","nunique"))
                .reset_index()
