@@ -163,8 +163,12 @@ with st.sidebar:
     else:
         gender_sel = "Todos"
 
+    st.markdown("---")
+    # Checkbox para activar/desactivar filtro temporal
+    usar_filtro_temporal = st.checkbox("🗓️ Aplicar filtro de fecha", value=False)
+    
     fecha_rango = ()
-    if "vp_f_compra" in df_raw.columns:
+    if usar_filtro_temporal and "vp_f_compra" in df_raw.columns:
         fechas = df_raw["vp_f_compra"].dropna()
         if len(fechas):
             f_min = fechas.min().date()
@@ -181,7 +185,8 @@ with st.sidebar:
 # FILTROS SEPARADOS
 # ══════════════════════════════════════════════════════════════════════════════
 # df: filtrado SIN rango temporal (para tablas resumen que mantienen todos los datos)
-# df_time: filtrado CON rango temporal (solo para gráficos temporales)
+# df_time: filtrado CON rango temporal (solo si usar_filtro_temporal=True)
+# IMPORTANTE: NO aplicar filtro de Gender a df para preservar los "Sin dato" en tablas
 
 df = df_raw.copy()
 if modelo_sel != "Todos":
@@ -190,16 +195,20 @@ if provincia_sel != "Todas" and "cl_dir_provincia" in df.columns:
     df = df[df["cl_dir_provincia"] == provincia_sel]
 if tipo_sel != "Todos":
     df = df[df["tipo_cliente"] == tipo_sel]
-if gender_sel != "Todos" and "Gender" in df.columns:
-    df = df[df["Gender"] == gender_sel]
+# NO aplicar gender_sel a df — preservar todos los registros incluyendo "Sin dato"
 
-# df_time: copia de df pero CON filtro temporal (solo registros con fecha en el rango)
+# df_time: copia de df pero CON filtro temporal (solo si checkbox está activo)
 # Se usa ÚNICAMENTE en gráficos que muestren tiempo (por año, por mes, tendencias)
 df_time = df.copy()
-if len(fecha_rango) == 2 and "vp_f_compra" in df_time.columns:
+if usar_filtro_temporal and len(fecha_rango) == 2 and "vp_f_compra" in df_time.columns:
     mask = ((df_time["vp_f_compra"].dt.date >= fecha_rango[0]) &
             (df_time["vp_f_compra"].dt.date <= fecha_rango[1]))
     df_time = df_time[mask]  # Sin incluir NaN — solo registros con fecha válida en rango
+
+# df_gen_filtered: SOLO para la vista de Género, aplicar el filtro de Gender aquí
+df_gen_filtered = df.copy()
+if gender_sel != "Todos" and "Gender" in df_gen_filtered.columns:
+    df_gen_filtered = df_gen_filtered[df_gen_filtered["Gender"] == gender_sel]
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -213,15 +222,15 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Disclaimer fechas nulas
-if "vp_f_compra" in df_raw.columns:
+# Disclaimer fechas nulas (solo mostrar si filtro temporal está activo)
+if usar_filtro_temporal and "vp_f_compra" in df_raw.columns:
     n_sin_fecha = int(df_raw["vp_f_compra"].isna().sum())
     if n_sin_fecha > 0:
         st.markdown(f"""
         <div style="background:rgba(255,180,0,0.07);border:1px solid rgba(255,180,0,0.25);
                     border-radius:6px;padding:8px 16px;margin-bottom:8px;font-size:11px;color:#a08030;">
             ⚠️ <b>{n_sin_fecha:,} registros</b> no tienen fecha de compra registrada.
-            Los gráficos temporales (por año y por mes) solo consideran registros con fecha válida.
+            Los gráficos temporales solo consideran registros con fecha válida en el rango seleccionado.
         </div>""", unsafe_allow_html=True)
 
 NO_MB = {"displayModeBar": False}
