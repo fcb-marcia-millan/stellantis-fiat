@@ -50,7 +50,7 @@ html, body, [class*="css"] { font-family: 'Barlow', sans-serif; }
 """, unsafe_allow_html=True)
 
 # ── Constantes ─────────────────────────────────────────────────────────────────
-SHEET_ID = "146V7WwyH1KCMRFIba77Dlm7IHsk4iF6yHaKBlFgYq_s"
+SHEET_ID = "1tzHwyKgoJAD68m37hTx6a5nm_MRl-uKkIVcL3jPiQsY"
 GID      = "0"
 CSV_URL  = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
 
@@ -548,13 +548,13 @@ elif pagina == "Empresas":
           <div class="kpi-card">
             <div class="kpi-label">Clientes únicos empresa</div>
             <div class="kpi-value" style="color:#fade2a">{clientes_unicos_corp:,}</div>
-            <div class="kpi-sub">DISTINCT DNI con empresa=1</div>
+            <div class="kpi-sub">Cuits únicos con empresa=1</div>
             <div class="kpi-bar"><div class="kpi-bar-fill" style="width:100%;background:#fade2a"></div></div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Registros corporativos</div>
+            <div class="kpi-label">Empresas</div>
             <div class="kpi-value" style="color:#fade2a">{registros_corp:,}</div>
-            <div class="kpi-sub">Suma de registros con empresa=1</div>
+            <div class="kpi-sub">Empresa=1</div>
             <div class="kpi-bar"><div class="kpi-bar-fill" style="width:75%;background:#fade2a"></div></div>
           </div>
           <div class="kpi-card">
